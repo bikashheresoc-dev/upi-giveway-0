@@ -21,7 +21,7 @@ DAILY_BONUS_AMOUNT = 10.0
 MIN_WITHDRAWAL = 50.0  
 DB_FILE = "giveaway_database.db"
 
-# 100% WORKING IMAGE LINK (Aapka Logo Banner)
+# Backup Image Link
 BANNER_URL = "https://raw.githubusercontent.com/Bikash7311/upi-giveway22/main/file_00000000699c72078bf5815b0d1a0995.png"
 
 user_states = {}
@@ -117,10 +117,11 @@ def send_photo(chat_id, photo_url, caption, reply_markup=None, parse_mode=None):
     if parse_mode: payload["parse_mode"] = parse_mode
     try: 
         res = requests.post(url, data=payload, timeout=10).json()
-        # Backup plan: Agar GitHub image load nahi hui, toh normal text message bhej dega taaki bot crash na ho
+        # CRASH PROTECTOR: Agar photo bhejte waqt error aaye, toh bot text bhej dega (rukesha nahi)
         if not res.get("ok"):
             send_message(chat_id, caption, reply_markup=reply_markup, parse_mode=parse_mode)
-    except: pass
+    except: 
+        send_message(chat_id, caption, reply_markup=reply_markup, parse_mode=parse_mode)
 
 def answer_callback_query(callback_query_id, text):
     url = API_URL + "/answerCallbackQuery"
@@ -137,7 +138,6 @@ def get_join_keyboard():
         ]
     }
 
-# AAPKE 4 MAST OPTIONS NEECHE WALE
 def get_mainframe_menu():
     return {
         "inline_keyboard": [
