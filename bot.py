@@ -9,7 +9,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 # =========================================
 # CONFIGURATION (Aapki Settings)
 # =========================================
-BOT_TOKEN = "8890676774:AAHOBKoCY--8J2HETlhBhDkxJeAFBvlal4Y"  # Updated Token
+BOT_TOKEN = "8890676774:AAHOBKoCY--8J2HETlhBhDkxJeAFBvlal4Y"  
 API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
 # Mandatory Join Settings
@@ -18,11 +18,11 @@ MANDATORY_BOT = "Nobita_infoo_bot"
 
 REFERRAL_BONUS = 10.0
 DAILY_BONUS_AMOUNT = 10.0
-MIN_WITHDRAWAL = 50.0  # Minimum withdrawal ₹50 set kar diya hai
+MIN_WITHDRAWAL = 50.0  
 DB_FILE = "giveaway_database.db"
 
-# Aapka naya wala mast logo banner link
-BANNER_URL = "https://raw.githubusercontent.com/Bikash7311/upi-giveway22/main/17790986288435596287189569091555_8c74f4.jpg"
+# 100% WORKING IMAGE LINK (Aapka Logo Banner)
+BANNER_URL = "https://raw.githubusercontent.com/Bikash7311/upi-giveway22/main/file_00000000699c72078bf5815b0d1a0995.png"
 
 user_states = {}
 
@@ -115,7 +115,11 @@ def send_photo(chat_id, photo_url, caption, reply_markup=None, parse_mode=None):
     payload = {"chat_id": chat_id, "photo": photo_url, "caption": caption}
     if reply_markup: payload["reply_markup"] = json.dumps(reply_markup)
     if parse_mode: payload["parse_mode"] = parse_mode
-    try: requests.post(url, data=payload, timeout=10)
+    try: 
+        res = requests.post(url, data=payload, timeout=10).json()
+        # Backup plan: Agar GitHub image load nahi hui, toh normal text message bhej dega taaki bot crash na ho
+        if not res.get("ok"):
+            send_message(chat_id, caption, reply_markup=reply_markup, parse_mode=parse_mode)
     except: pass
 
 def answer_callback_query(callback_query_id, text):
@@ -133,6 +137,7 @@ def get_join_keyboard():
         ]
     }
 
+# AAPKE 4 MAST OPTIONS NEECHE WALE
 def get_mainframe_menu():
     return {
         "inline_keyboard": [
@@ -186,15 +191,11 @@ def handle_message(message):
         user_states[chat_id] = "idle"
         return
 
-    # Handle UPI ID Input for Withdrawal
     if user_states.get(chat_id) == "awaiting_upi":
         if "@" in user_text and len(user_text) > 5:
             balance, _ = get_user_data(user_id)
             if balance >= MIN_WITHDRAWAL:
-                # Deduct balance after withdrawal request
                 update_balance(user_id, -balance)
-                
-                # Dynamic success message
                 success_msg = (
                     f"🎉 <b>CONGRATULATIONS !!!</b> 🎉\n"
                     f"━━━━━━━━━━━━━━━━━━━━\n"
@@ -208,7 +209,7 @@ def handle_message(message):
                 send_message(chat_id, success_msg, reply_markup=get_back_keyboard(), parse_mode="HTML")
             user_states[chat_id] = "idle"
         else:
-            send_message(chat_id, "❌ <b>Galat UPI ID!</b> Kripya sahi UPI ID bhejiye (e.g. name@upi, 9876543210@paytm):")
+            send_message(chat_id, "❌ <b>Galat UPI ID!</b> Kripya sahi UPI ID bhejiye:")
         return
 
 def handle_callback(callback):
@@ -220,7 +221,8 @@ def handle_callback(callback):
     if data == "verify_join":
         if is_user_joined(user_id):
             answer_callback_query(callback_id, "✅ Pass!")
-            send_message(chat_id, "🎉 Verification Successful! Use /start to open menu.", reply_markup=get_mainframe_menu())
+            welcome_text = f"🎁 <b>WELCOME TO UPI GIVEAWAY MAINFRAME</b> 🎁\n\nNiche diye gaye buttons se apna wallet manage karein 👇"
+            send_photo(chat_id, BANNER_URL, welcome_text, reply_markup=get_mainframe_menu(), parse_mode="HTML")
         else:
             answer_callback_query(callback_id, "❌ Join pending!")
         return
