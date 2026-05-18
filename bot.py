@@ -9,7 +9,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 # =========================================
 # CONFIGURATION (Aapki Settings)
 # =========================================
-BOT_TOKEN = "8890676774:AAHOBKoCY--8J2HETlhBhDkxJeAFBvlal4Y"  # UPI Giveaway Bot Token
+BOT_TOKEN = "8890676774:AAHOBKoCY--8J2HETlhBhDkxJeAFBvlal4Y"  # Updated Token
 API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
 # Mandatory Join Settings
@@ -18,7 +18,7 @@ MANDATORY_BOT = "Nobita_infoo_bot"
 
 REFERRAL_BONUS = 10.0
 DAILY_BONUS_AMOUNT = 10.0
-MIN_WITHDRAWAL = 100.0  # Minimum withdrawal ₹100 set kar diya hai
+MIN_WITHDRAWAL = 50.0  # Minimum withdrawal ₹50 set kar diya hai
 DB_FILE = "giveaway_database.db"
 
 # Aapka naya wala mast logo banner link
@@ -170,4 +170,140 @@ def handle_message(message):
                 if referrer_id != user_id:
                     if add_referral(referrer_id, user_id):
                         update_balance(referrer_id, REFERRAL_BONUS)
-                        send_message(referrer_id, f"🎉 <b>New Referral!</b>\n\n💸 <b>+₹
+                        send_message(referrer_id, f"🎉 <b>New Referral!</b>\n\n💸 <b>+₹{int(REFERRAL_BONUS)} Added</b> to your balance!")
+            except: pass
+
+        welcome_text = (
+            f"🎁 <b>WELCOME TO UPI GIVEAWAY MAINFRAME</b> 🎁\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"👥 Per Referral: <b>₹{int(REFERRAL_BONUS)}</b>\n"
+            f"🎁 Daily Bonus: <b>₹{int(DAILY_BONUS_AMOUNT)}</b>\n"
+            f"💳 Minimum Payout: <b>₹{int(MIN_WITHDRAWAL)}</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"Niche diye gaye buttons se apna wallet manage karein 👇"
+        )
+        send_photo(chat_id, BANNER_URL, welcome_text, reply_markup=get_mainframe_menu(), parse_mode="HTML")
+        user_states[chat_id] = "idle"
+        return
+
+    # Handle UPI ID Input for Withdrawal
+    if user_states.get(chat_id) == "awaiting_upi":
+        if "@" in user_text and len(user_text) > 5:
+            balance, _ = get_user_data(user_id)
+            if balance >= MIN_WITHDRAWAL:
+                # Deduct balance after withdrawal request
+                update_balance(user_id, -balance)
+                
+                # Dynamic success message
+                success_msg = (
+                    f"🎉 <b>CONGRATULATIONS !!!</b> 🎉\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"✅ Aapki withdrawal request successfully lag chuki hai!\n\n"
+                    f"💰 <b>Amount:</b> ₹{balance}\n"
+                    f"💳 <b>UPI ID:</b> <code>{user_text}</code>\n"
+                    f"⏳ <b>Status:</b> Pending (Verification checking)\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"📢 <i>Kripya <b>1-2 hours</b> tak wait karein. Admin aapki details verify karke direct aapke account me paise bhej dega! Thank you.</i>"
+                )
+                send_message(chat_id, success_msg, reply_markup=get_back_keyboard(), parse_mode="HTML")
+            user_states[chat_id] = "idle"
+        else:
+            send_message(chat_id, "❌ <b>Galat UPI ID!</b> Kripya sahi UPI ID bhejiye (e.g. name@upi, 9876543210@paytm):")
+        return
+
+def handle_callback(callback):
+    callback_id = callback["id"]
+    chat_id = callback["message"]["chat"]["id"]
+    user_id = callback["from"]["id"]
+    data = callback["data"]
+
+    if data == "verify_join":
+        if is_user_joined(user_id):
+            answer_callback_query(callback_id, "✅ Pass!")
+            send_message(chat_id, "🎉 Verification Successful! Use /start to open menu.", reply_markup=get_mainframe_menu())
+        else:
+            answer_callback_query(callback_id, "❌ Join pending!")
+        return
+
+    if not is_user_joined(user_id): return
+
+    balance, last_bonus = get_user_data(user_id)
+
+    if data == "menu_balance":
+        bal_text = (
+            f"💳 <b>YOUR WALLET BALANCE</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"💰 <b>Current Balance:</b> <code>₹{balance}</code>\n"
+            f"👥 <b>Total Referrals:</b> <code>{get_referral_count(user_id)} Friends</code>\n\n"
+            f"📢 <i>Note: Per Referral ₹10 milte hain.</i>"
+        )
+        send_message(chat_id, bal_text, reply_markup=get_back_keyboard(), parse_mode="HTML")
+
+    elif data == "menu_referral":
+        ref_link = f"https://t.me/Upi_givewaybot?start={user_id}"
+        ref_text = (
+            f"👥 <b>REFERRAL PROGRAM PANEL</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"💵 <b>Per Referral Reward:</b> ₹{int(REFERRAL_BONUS)}\n\n"
+            f"🔗 <b>Aapka Personal Link:</b>\n<code>{ref_link}</code>\n"
+            f"━━━━━━━━━━━━━━━━━━━━"
+        )
+        send_message(chat_id, ref_text, reply_markup=get_back_keyboard(), parse_mode="HTML")
+
+    elif data == "menu_bonus":
+        now = int(time.time())
+        if now - last_bonus >= 86400:
+            update_balance(user_id, DAILY_BONUS_AMOUNT)
+            update_bonus_time(user_id, now)
+            send_message(chat_id, f"🎁 <b>Daily Bonus Claimed! +₹10 Added</b>\n\n🔄 Agla bonus 24 hours baad milega!", reply_markup=get_back_keyboard(), parse_mode="HTML")
+        else:
+            send_message(chat_id, f"⏳ Aap bonus claim kar chuke hain! Kripya agle bonus ke liye 24 ghante ka intezar karein.", reply_markup=get_back_keyboard(), parse_mode="HTML")
+
+    elif data == "menu_withdraw":
+        if balance < MIN_WITHDRAWAL:
+            answer_callback_query(callback_id, "❌ Minimum Withdrawal ₹50")
+            lock_text = (
+                f"📊 <b>REFERRAL TARGET STATUS</b>\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"Paise nikalne ke liye target poora karein:\n\n"
+                f"👥 5 Referrals  = <b>₹50</b> (Min withdrawal)\n"
+                f"👥 10 Referrals = <b>₹100</b>\n"
+                f"👥 20 Referrals = <b>₹200</b>\n"
+                f"👥 50 Referrals = <b>₹500</b>\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"⚠️ Aapka current balance: <b>₹{balance}</b>\n"
+                f"🛑 <b>Minimum withdrawal ₹{int(MIN_WITHDRAWAL)} rs hai!</b>\n\n"
+                f"💡 Dosto ko invite karke target poora karein!"
+            )
+            send_message(chat_id, lock_text, reply_markup=get_back_keyboard(), parse_mode="HTML")
+        else:
+            answer_callback_query(callback_id, "💳 Withdrawal Active")
+            send_message(chat_id, "💸 <b>WITHDRAWAL PROTOCOL ACTIVE</b>\n\nKripya apni active <b>UPI ID</b> niche type karke send karein:")
+            user_states[chat_id] = "awaiting_upi"
+
+    elif data == "go_back":
+        welcome_text = f"🎁 <b>WELCOME TO UPI GIVEAWAY MAINFRAME</b> 🎁\n\nNiche diye gaye buttons se apna wallet manage karein 👇"
+        send_photo(chat_id, BANNER_URL, welcome_text, reply_markup=get_mainframe_menu(), parse_mode="HTML")
+
+class WebServer(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"ONLINE")
+
+def bot_polling():
+    offset = 0
+    while True:
+        try:
+            response = requests.get(API_URL + "/getUpdates", params={"timeout": 30, "offset": offset}, timeout=35).json()
+            if response.get("ok"):
+                for update in response["result"]:
+                    offset = update["update_id"] + 1
+                    if "message" in update: handle_message(update["message"])
+                    elif "callback_query" in update: handle_callback(update["callback_query"])
+        except: time.sleep(1)
+
+if __name__ == "__main__":
+    init_db()
+    Thread(target=lambda: HTTPServer(("0.0.0.0", int(os.environ.get("PORT", 8080))), WebServer).serve_forever(), daemon=True).start()
+    bot_polling()
